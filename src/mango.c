@@ -3431,12 +3431,6 @@ void createmon(struct wl_listener *listener, void *data) {
 		wlr_output_state_set_mode(&pending,
 								  wlr_output_preferred_mode(wlr_output));
 
-	// 设置监听器
-	LISTEN(&wlr_output->events.frame, &m->frame, rendermon);
-	LISTEN(&wlr_output->events.destroy, &m->destroy, cleanupmon);
-	LISTEN(&wlr_output->events.request_state, &m->request_state,
-		   requestmonstate);
-
 	// ===================================================
 	// 构建最终的输出状态，包含 HDR，并通过 scene 提交
 	// ===================================================
@@ -3550,6 +3544,12 @@ void createmon(struct wl_listener *listener, void *data) {
 	}
 
 	updatemons(NULL, NULL);
+
+	// 设置监听器
+	LISTEN(&wlr_output->events.frame, &m->frame, rendermon);
+	LISTEN(&wlr_output->events.destroy, &m->destroy, cleanupmon);
+	LISTEN(&wlr_output->events.request_state, &m->request_state,
+		   requestmonstate);
 
 	printstatus(IPC_WATCH_ARRANGGE);
 }
