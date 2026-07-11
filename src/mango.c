@@ -3549,7 +3549,7 @@ void createmon(struct wl_listener *listener, void *data) {
 		add_workspace_by_tag(i, m);
 	}
 
-	wlr_output_schedule_frame(m->wlr_output);
+	updatemons(NULL, NULL);
 
 	printstatus(IPC_WATCH_ARRANGGE);
 }
