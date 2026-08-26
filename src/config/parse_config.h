@@ -2423,7 +2423,7 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 				} else if (strcmp(key, "vrr") == 0) {
 					rule->vrr = CLAMP_INT(atoi(val), 0, 1);
 				} else if (strcmp(key, "hdr") == 0) {
-					rule->hdr = CLAMP_INT(atoi(val), 0, 1);
+					rule->hdr = CLAMP_INT(atoi(val), 0, 2);
 				} else if (strcmp(key, "hdr_min_lum") == 0) {
 					// cd/m². OLED blacks sit well below 0.01, so the floor has
 					// to allow small fractions -- do not clamp to >= 1.

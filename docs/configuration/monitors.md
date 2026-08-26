@@ -30,7 +30,7 @@ monitorrule=name:Values,Parameter:Values,Parameter:Values
 | `y` | integer | 0-99999 | Y position |
 | `scale` | float | 0.01-100.0 | Monitor scale |
 | `vrr` | integer | 0, 1 | Enable variable refresh rate |
-| `hdr` | integer | 0, 1 | Enable hdr support |
+| `hdr` | integer | 0, 1, 2 | Enable hdr support. `2` additionally reads the panel's mastering luminance and color primaries from its EDID, so tone mapping targets the display's real limits instead of generic defaults. `hdr_min_lum`/`hdr_max_lum`/`hdr_max_avg_lum` still override it. |
 | `hdr_min_lum` | float | 0.0-10000.0 | Mastering display minimum luminance, cd/m² (0 = unset) |
 | `hdr_max_lum` | float | 0.0-10000.0 | Mastering display peak luminance, also sent as max_cll, cd/m² (0 = unset) |
 | `hdr_max_avg_lum` | float | 0.0-10000.0 | Max frame-average light level (max_fall), cd/m² (0 = unset) |

@@ -630,7 +630,7 @@ struct Monitor {
 	int8_t carousel_anim_dir;
 	bool vrr_global_enable;
 	bool is_vrr_enabling;
-	bool hdr_enable;
+	int32_t hdr_enable;
 	bool prefer_disable;
 	bool is_hdr_enabling;
 	// Mastering display metadata, in cd/m². 0 = unset, see output_enable_hdr().
