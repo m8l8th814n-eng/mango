@@ -523,6 +523,7 @@ typedef struct {
 	DecorateDrawData groupbardata;
 
 	int32_t hdr_depth;
+	float hdr_sdr_nits;
 } Config;
 
 typedef struct {
@@ -1724,6 +1725,8 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		config->allow_tearing = atoi(value);
 	} else if (strcmp(key, "hdr_depth") == 0) {
 		config->hdr_depth = atoi(value);
+	} else if (strcmp(key, "hdr_sdr_nits") == 0) {
+		config->hdr_sdr_nits = atof(value);
 	} else if (strcmp(key, "allow_shortcuts_inhibit") == 0) {
 		config->allow_shortcuts_inhibit = atoi(value);
 	} else if (strcmp(key, "allow_lock_transparent") == 0) {
@@ -4271,6 +4274,8 @@ void override_config(void) {
 	config.drag_tile_small = CLAMP_INT(config.drag_tile_small, 0, 1);
 	config.allow_tearing = CLAMP_INT(config.allow_tearing, 0, 2);
 	config.hdr_depth = CLAMP_INT(config.hdr_depth, 0, 2);
+	config.hdr_sdr_nits = CLAMP_FLOAT(config.hdr_sdr_nits, 50.0f, 10000.0f);
+	scenefx_set_sdr_reference_luminance(config.hdr_sdr_nits);
 	config.allow_shortcuts_inhibit =
 		CLAMP_INT(config.allow_shortcuts_inhibit, 0, 1);
 	config.allow_lock_transparent =
@@ -4489,6 +4494,7 @@ void set_value_default() {
 	config.drag_floating_refresh_interval = 8.0f;
 	config.allow_tearing = TEARING_DISABLED;
 	config.hdr_depth = MANGO_RENDER_BIT_DEPTH_10;
+	config.hdr_sdr_nits = 203;
 	config.allow_shortcuts_inhibit = SHORTCUTS_INHIBIT_ENABLE;
 	config.allow_lock_transparent = 0;
 	config.no_border_when_single = 0;
