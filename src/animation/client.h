@@ -1514,6 +1514,12 @@ bool client_draw_fadeout_frame(Client *c) {
 void client_set_focused_opacity_animation(Client *c) {
 	float *border_color = get_border_color(c);
 	wlr_scene_node_lower_to_bottom(&c->border->node);
+	// Lowering the border puts it below the blur node, so the blur samples a
+	// blend image that already contains the border ring and composites a
+	// blurred copy of it back over the window's edges. Keep the blur beneath
+	// the border.
+	if (config.blur && !c->noblur)
+		wlr_scene_node_lower_to_bottom(&c->blur->node);
 
 	if (!config.animations) {
 		setborder_color(c);
