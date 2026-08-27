@@ -10,10 +10,13 @@ lives in these three branches.
 | scenefx, Vulkan blur/corners/shadows + HDR color transforms | `m8l8th814n-eng/scenefx` | `vulkan-hdr` |
 | the compositor | `m8l8th814n-eng/mango` | `mangowm-ng` |
 
-Build in that order — mango links both by pkg-config (`wlroots-vkfx-0.20`,
-`scenefx-0.5`).
+You only clone mango. `subprojects/*.wrap` points meson at the other two, so
+they are fetched and built as subprojects unless the system already has them
+installed.
 
 ## Arch
+
+Three packages, built in this order:
 
 ```sh
 git clone -b mangowm-ng https://github.com/m8l8th814n-eng/mango.git
@@ -28,22 +31,19 @@ cd mango/packaging
 ## Any other distro
 
 ```sh
-PREFIX=/usr/local
-
-git clone -b vulkan-effects https://github.com/m8l8th814n-eng/wlroots-vkfx.git
-meson setup wlroots-vkfx/build wlroots-vkfx --prefix=$PREFIX -Dexamples=false
-meson install -C wlroots-vkfx/build
-
-export PKG_CONFIG_PATH=$PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH
-
-git clone -b vulkan-hdr https://github.com/m8l8th814n-eng/scenefx.git
-meson setup scenefx/build scenefx --prefix=$PREFIX
-meson install -C scenefx/build
-
 git clone -b mangowm-ng https://github.com/m8l8th814n-eng/mango.git
-meson setup mango/build mango --prefix=$PREFIX
-meson install -C mango/build
+cd mango
+meson setup build
+ninja -C build
+meson install -C build
 ```
+
+wlroots-vkfx and scenefx are pulled in and linked statically. If the machine
+already has either one installed system-wide, meson uses that copy instead —
+force the subproject with `meson setup build --force-fallback-for=wlroots-vkfx,scenefx`.
+
+The Arch packages above are the other way round: three separate shared
+libraries, so anything else on the system can link them too.
 
 Build deps: meson, ninja, glslang, vulkan-headers, wayland-protocols, libdrm,
 pixman, libxkbcommon, libinput, libdisplay-info, libliftoff, seatd, lcms2,
