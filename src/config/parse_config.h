@@ -4211,48 +4211,55 @@ void free_config(void) {
 
 void update_global_var(void) { tagmask = ((uint32_t)1 << config.tag_num) - 1; }
 
-#define COLOR_ADJUST_LUT_DIM 256
-
-static struct wlr_color_transform *color_adjust_transform = NULL;
-
-/* Post-blend LUT for gamma, contrast and per-channel gain. It lands in the
+/* Post-blend LUT for gamma, contrast and per-channel gain. It goes into the
  * same output state slot as a gamma ramp, so it also applies while the output
- * carries an HDR image description — there it operates on PQ-encoded values. */
-static void color_adjust_rebuild(void) {
-	wlr_color_transform_unref(color_adjust_transform);
-	color_adjust_transform = NULL;
+ * carries an HDR image description — there it operates on PQ-encoded values.
+ * The DRM backend only takes 3x1D LUTs sized to the CRTC's gamma table. */
+static bool color_adjust_enabled(void) {
+	return config.color_gamma != 1.0f || config.color_contrast != 1.0f ||
+		   config.color_red != 1.0f || config.color_green != 1.0f ||
+		   config.color_blue != 1.0f || config.color_yellow != 0.0f;
+}
+
+static struct wlr_color_transform *color_adjust_build(size_t dim) {
+	uint16_t *lut = calloc(dim * 3, sizeof(*lut));
+	if (!lut) {
+		return NULL;
+	}
+	uint16_t *r = lut, *g = lut + dim, *b = lut + 2 * dim;
 
 	float gain[3] = {config.color_red, config.color_green,
 					 config.color_blue * (1.0f - config.color_yellow)};
 
-	if (config.color_gamma == 1.0f && config.color_contrast == 1.0f &&
-		gain[0] == 1.0f && gain[1] == 1.0f && gain[2] == 1.0f) {
-		return;
-	}
-
-	uint16_t lut[3][COLOR_ADJUST_LUT_DIM];
-	for (size_t i = 0; i < COLOR_ADJUST_LUT_DIM; i++) {
-		float v = (float)i / (COLOR_ADJUST_LUT_DIM - 1);
+	for (size_t i = 0; i < dim; i++) {
+		float v = (float)i / (float)(dim - 1);
 		v = (v - 0.5f) * config.color_contrast + 0.5f;
 		v = CLAMP_FLOAT(v, 0.0f, 1.0f);
 		v = powf(v, 1.0f / config.color_gamma);
-		for (int c = 0; c < 3; c++) {
-			float out = CLAMP_FLOAT(v * gain[c], 0.0f, 1.0f);
-			lut[c][i] = (uint16_t)lroundf(out * 65535.0f);
-		}
+		r[i] = (uint16_t)lroundf(CLAMP_FLOAT(v * gain[0], 0.0f, 1.0f) * 65535.0f);
+		g[i] = (uint16_t)lroundf(CLAMP_FLOAT(v * gain[1], 0.0f, 1.0f) * 65535.0f);
+		b[i] = (uint16_t)lroundf(CLAMP_FLOAT(v * gain[2], 0.0f, 1.0f) * 65535.0f);
 	}
 
-	color_adjust_transform = wlr_color_transform_init_lut_3x1d(
-		COLOR_ADJUST_LUT_DIM, lut[0], lut[1], lut[2]);
-	if (!color_adjust_transform) {
-		wlr_log(WLR_ERROR, "color adjust: could not build the LUT");
-	}
+	struct wlr_color_transform *tr = wlr_color_transform_init_lut_3x1d(dim, r, g, b);
+	free(lut);
+	return tr;
 }
 
 static void color_adjust_apply(Monitor *m) {
+	struct wlr_color_transform *tr = NULL;
+	if (color_adjust_enabled()) {
+		size_t dim = wlr_output_get_gamma_size(m->wlr_output);
+		tr = color_adjust_build(dim ? dim : 256);
+		if (!tr) {
+			wlr_log(WLR_ERROR, "color adjust: could not build the LUT");
+			return;
+		}
+	}
+
 	struct wlr_output_state state;
 	wlr_output_state_init(&state);
-	wlr_output_state_set_color_transform(&state, color_adjust_transform);
+	wlr_output_state_set_color_transform(&state, tr);
 	if (wlr_output_test_state(m->wlr_output, &state)) {
 		wlr_output_commit_state(m->wlr_output, &state);
 	} else {
@@ -4260,6 +4267,7 @@ static void color_adjust_apply(Monitor *m) {
 				m->wlr_output->name);
 	}
 	wlr_output_state_finish(&state);
+	wlr_color_transform_unref(tr);
 }
 
 void override_config(void) {
@@ -4351,7 +4359,6 @@ void override_config(void) {
 	config.color_green = CLAMP_FLOAT(config.color_green, 0.0f, 4.0f);
 	config.color_blue = CLAMP_FLOAT(config.color_blue, 0.0f, 4.0f);
 	config.color_yellow = CLAMP_FLOAT(config.color_yellow, 0.0f, 1.0f);
-	color_adjust_rebuild();
 	if (mons.next) {
 		Monitor *color_adjust_mon;
 		wl_list_for_each(color_adjust_mon, &mons, link) {

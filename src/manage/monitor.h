@@ -590,7 +590,7 @@ void createmon(struct wl_listener *listener, void *data) {
 	wlr_output_state_finish(&state);
 	wlr_output_state_finish(&pending);
 
-	if (color_adjust_transform) {
+	if (color_adjust_enabled()) {
 		color_adjust_apply(m);
 	}
 
