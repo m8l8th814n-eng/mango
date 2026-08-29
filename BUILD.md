@@ -22,8 +22,8 @@ Three packages, built in this order:
 git clone -b mangowm-ng https://github.com/m8l8th814n-eng/mango.git
 cd mango/packaging
 (cd wlroots-vkfx && makepkg -si)
-(cd scenefx      && makepkg -si)
-(cd mango        && makepkg -si)
+(cd scenefx0.5   && makepkg -si)
+(cd mangowm-ng   && makepkg -si)
 ```
 
 `wlroots-vkfx` installs alongside a stock `wlroots0.20`, it does not replace it.
