@@ -524,6 +524,12 @@ typedef struct {
 
 	int32_t hdr_depth;
 	float hdr_sdr_nits;
+	float color_gamma;
+	float color_contrast;
+	float color_red;
+	float color_green;
+	float color_blue;
+	float color_yellow;
 } Config;
 
 typedef struct {
@@ -1727,6 +1733,18 @@ bool parse_option(Config *config, char *key, char *value, int line_number) {
 		config->hdr_depth = atoi(value);
 	} else if (strcmp(key, "hdr_sdr_nits") == 0) {
 		config->hdr_sdr_nits = atof(value);
+	} else if (strcmp(key, "color_gamma") == 0) {
+		config->color_gamma = atof(value);
+	} else if (strcmp(key, "color_contrast") == 0) {
+		config->color_contrast = atof(value);
+	} else if (strcmp(key, "color_red") == 0) {
+		config->color_red = atof(value);
+	} else if (strcmp(key, "color_green") == 0) {
+		config->color_green = atof(value);
+	} else if (strcmp(key, "color_blue") == 0) {
+		config->color_blue = atof(value);
+	} else if (strcmp(key, "color_yellow") == 0) {
+		config->color_yellow = atof(value);
 	} else if (strcmp(key, "allow_shortcuts_inhibit") == 0) {
 		config->allow_shortcuts_inhibit = atoi(value);
 	} else if (strcmp(key, "allow_lock_transparent") == 0) {
@@ -4193,6 +4211,57 @@ void free_config(void) {
 
 void update_global_var(void) { tagmask = ((uint32_t)1 << config.tag_num) - 1; }
 
+#define COLOR_ADJUST_LUT_DIM 256
+
+static struct wlr_color_transform *color_adjust_transform = NULL;
+
+/* Post-blend LUT for gamma, contrast and per-channel gain. It lands in the
+ * same output state slot as a gamma ramp, so it also applies while the output
+ * carries an HDR image description — there it operates on PQ-encoded values. */
+static void color_adjust_rebuild(void) {
+	wlr_color_transform_unref(color_adjust_transform);
+	color_adjust_transform = NULL;
+
+	float gain[3] = {config.color_red, config.color_green,
+					 config.color_blue * (1.0f - config.color_yellow)};
+
+	if (config.color_gamma == 1.0f && config.color_contrast == 1.0f &&
+		gain[0] == 1.0f && gain[1] == 1.0f && gain[2] == 1.0f) {
+		return;
+	}
+
+	uint16_t lut[3][COLOR_ADJUST_LUT_DIM];
+	for (size_t i = 0; i < COLOR_ADJUST_LUT_DIM; i++) {
+		float v = (float)i / (COLOR_ADJUST_LUT_DIM - 1);
+		v = (v - 0.5f) * config.color_contrast + 0.5f;
+		v = CLAMP_FLOAT(v, 0.0f, 1.0f);
+		v = powf(v, 1.0f / config.color_gamma);
+		for (int c = 0; c < 3; c++) {
+			float out = CLAMP_FLOAT(v * gain[c], 0.0f, 1.0f);
+			lut[c][i] = (uint16_t)lroundf(out * 65535.0f);
+		}
+	}
+
+	color_adjust_transform = wlr_color_transform_init_lut_3x1d(
+		COLOR_ADJUST_LUT_DIM, lut[0], lut[1], lut[2]);
+	if (!color_adjust_transform) {
+		wlr_log(WLR_ERROR, "color adjust: could not build the LUT");
+	}
+}
+
+static void color_adjust_apply(Monitor *m) {
+	struct wlr_output_state state;
+	wlr_output_state_init(&state);
+	wlr_output_state_set_color_transform(&state, color_adjust_transform);
+	if (wlr_output_test_state(m->wlr_output, &state)) {
+		wlr_output_commit_state(m->wlr_output, &state);
+	} else {
+		wlr_log(WLR_ERROR, "color adjust: %s rejected the LUT",
+				m->wlr_output->name);
+	}
+	wlr_output_state_finish(&state);
+}
+
 void override_config(void) {
 	config.animations = CLAMP_INT(config.animations, 0, 1);
 	config.layer_animations = CLAMP_INT(config.layer_animations, 0, 1);
@@ -4276,6 +4345,19 @@ void override_config(void) {
 	config.hdr_depth = CLAMP_INT(config.hdr_depth, 0, 2);
 	config.hdr_sdr_nits = CLAMP_FLOAT(config.hdr_sdr_nits, 50.0f, 10000.0f);
 	scenefx_set_sdr_reference_luminance(config.hdr_sdr_nits);
+	config.color_gamma = CLAMP_FLOAT(config.color_gamma, 0.1f, 10.0f);
+	config.color_contrast = CLAMP_FLOAT(config.color_contrast, 0.1f, 10.0f);
+	config.color_red = CLAMP_FLOAT(config.color_red, 0.0f, 4.0f);
+	config.color_green = CLAMP_FLOAT(config.color_green, 0.0f, 4.0f);
+	config.color_blue = CLAMP_FLOAT(config.color_blue, 0.0f, 4.0f);
+	config.color_yellow = CLAMP_FLOAT(config.color_yellow, 0.0f, 1.0f);
+	color_adjust_rebuild();
+	if (mons.next) {
+		Monitor *color_adjust_mon;
+		wl_list_for_each(color_adjust_mon, &mons, link) {
+			color_adjust_apply(color_adjust_mon);
+		}
+	}
 	config.allow_shortcuts_inhibit =
 		CLAMP_INT(config.allow_shortcuts_inhibit, 0, 1);
 	config.allow_lock_transparent =
@@ -4495,6 +4577,12 @@ void set_value_default() {
 	config.allow_tearing = TEARING_DISABLED;
 	config.hdr_depth = MANGO_RENDER_BIT_DEPTH_10;
 	config.hdr_sdr_nits = 203;
+	config.color_gamma = 1.0f;
+	config.color_contrast = 1.0f;
+	config.color_red = 1.0f;
+	config.color_green = 1.0f;
+	config.color_blue = 1.0f;
+	config.color_yellow = 0.0f;
 	config.allow_shortcuts_inhibit = SHORTCUTS_INHIBIT_ENABLE;
 	config.allow_lock_transparent = 0;
 	config.no_border_when_single = 0;

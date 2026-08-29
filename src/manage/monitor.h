@@ -590,6 +590,10 @@ void createmon(struct wl_listener *listener, void *data) {
 	wlr_output_state_finish(&state);
 	wlr_output_state_finish(&pending);
 
+	if (color_adjust_transform) {
+		color_adjust_apply(m);
+	}
+
 	// 加入布局
 	struct wlr_output_layout_output *layout_output;
 	if (m->m.x == INT32_MAX || m->m.y == INT32_MAX)
