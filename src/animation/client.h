@@ -252,6 +252,11 @@ void scene_buffer_apply_effect(struct wlr_scene_buffer *buffer, int32_t sx,
 	if (wlr_xdg_popup_try_from_wlr_surface(surface) != NULL)
 		return;
 
+	wlr_log(WLR_ERROR, "DBG buffer corners tl=%u tr=%u br=%u bl=%u",
+			 buffer_data->corner_location.top_left,
+			 buffer_data->corner_location.top_right,
+			 buffer_data->corner_location.bottom_right,
+			 buffer_data->corner_location.bottom_left);
 	wlr_scene_buffer_set_corner_radii(buffer, buffer_data->corner_location);
 }
 
